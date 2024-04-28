@@ -43,6 +43,12 @@ def cli():
         type=bool,
         help="return full generation to be used as a history prompt",
     )
+    parser.add_argument(
+        "--models",
+        default=None,
+        type=str,
+        help="path to locally stored model checkpoint files",
+    )
 
     args = vars(parser.parse_args())
     input_text: str = args.get("text")
@@ -53,6 +59,7 @@ def cli():
     waveform_temp: float = args.get("waveform_temp")
     silent: bool = args.get("silent")
     output_full: bool = args.get("output_full")
+    model_path: str = args.get("models")
 
     try:
         os.makedirs(output_dir, exist_ok=True)
@@ -63,6 +70,7 @@ def cli():
             waveform_temp=waveform_temp,
             silent=silent,
             output_full=output_full,
+            model_path=model_path,
         )
         output_file_path = os.path.join(output_dir, output_filename)
         write_wav(output_file_path, SAMPLE_RATE, generated_audio)

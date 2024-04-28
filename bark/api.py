@@ -10,6 +10,7 @@ def text_to_semantic(
     history_prompt: Optional[Union[Dict, str]] = None,
     temp: float = 0.7,
     silent: bool = False,
+    model_path: str = None,
 ):
     """Generate semantic array from text.
 
@@ -18,6 +19,7 @@ def text_to_semantic(
         history_prompt: history choice for audio cloning
         temp: generation temperature (1.0 more diverse, 0.0 more conservative)
         silent: disable progress bar
+        model_path: path to locally stored model checkpoint files
 
     Returns:
         numpy semantic array to be fed into `semantic_to_waveform`
@@ -27,7 +29,8 @@ def text_to_semantic(
         history_prompt=history_prompt,
         temp=temp,
         silent=silent,
-        use_kv_caching=True
+        use_kv_caching=True,
+        model_path=model_path,
     )
     return x_semantic
 
@@ -38,6 +41,7 @@ def semantic_to_waveform(
     temp: float = 0.7,
     silent: bool = False,
     output_full: bool = False,
+    model_path: str = None,
 ):
     """Generate audio array from semantic input.
 
@@ -47,6 +51,7 @@ def semantic_to_waveform(
         temp: generation temperature (1.0 more diverse, 0.0 more conservative)
         silent: disable progress bar
         output_full: return full generation to be used as a history prompt
+        model_path: path to locally stored model checkpoint files
 
     Returns:
         numpy audio array at sample frequency 24khz
@@ -56,12 +61,14 @@ def semantic_to_waveform(
         history_prompt=history_prompt,
         temp=temp,
         silent=silent,
-        use_kv_caching=True
+        use_kv_caching=True,
+        model_path=model_path,
     )
     fine_tokens = generate_fine(
         coarse_tokens,
         history_prompt=history_prompt,
         temp=0.5,
+        model_path=model_path,
     )
     audio_arr = codec_decode(fine_tokens)
     if output_full:
@@ -90,6 +97,7 @@ def generate_audio(
     waveform_temp: float = 0.7,
     silent: bool = False,
     output_full: bool = False,
+    model_path: str = None,
 ):
     """Generate audio array from input text.
 
@@ -100,6 +108,7 @@ def generate_audio(
         waveform_temp: generation temperature (1.0 more diverse, 0.0 more conservative)
         silent: disable progress bar
         output_full: return full generation to be used as a history prompt
+        model_path: path to locally stored model checkpoint file
 
     Returns:
         numpy audio array at sample frequency 24khz
@@ -109,6 +118,7 @@ def generate_audio(
         history_prompt=history_prompt,
         temp=text_temp,
         silent=silent,
+        model_path=model_path,
     )
     out = semantic_to_waveform(
         semantic_tokens,
@@ -116,6 +126,7 @@ def generate_audio(
         temp=waveform_temp,
         silent=silent,
         output_full=output_full,
+        model_path=model_path,
     )
     if output_full:
         full_generation, audio_arr = out

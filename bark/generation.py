@@ -139,16 +139,20 @@ def _grab_best_device(use_gpu=True):
     return device
 
 
-def _get_ckpt_path(model_type, use_small=False):
-    key = model_type
-    if use_small or USE_SMALL_MODELS:
-        key += "_small"
-    return os.path.join(CACHE_DIR, REMOTE_MODEL_PATHS[key]["file_name"])
+def _get_ckpt_path(model_type, use_small=False, model_path=None):
+    if model_path is None:
+        key = model_type
+        if use_small or USE_SMALL_MODELS:
+            key += "_small"
+        return os.path.join(CACHE_DIR, REMOTE_MODEL_PATHS[key]["file_name"])
+
+    model_path += model_type + '.pt' if use_small or USE_SMALL_MODELS else '_2.pt'
+    return model_path
 
 
 def _download(from_hf_path, file_name):
     os.makedirs(CACHE_DIR, exist_ok=True)
-    hf_hub_download(repo_id=from_hf_path, filename=file_name, local_dir=CACHE_DIR)
+    hf_hub_download(repo_id=from_hf_path, filename=file_name, local_dir=CACHE_DIR, local_dir_use_symlinks=False)
 
 
 class InferenceContext:
@@ -258,7 +262,7 @@ def _load_codec_model(device):
     return model
 
 
-def load_model(use_gpu=True, use_small=False, force_reload=False, model_type="text"):
+def load_model(use_gpu=True, use_small=False, force_reload=False, model_type="text", model_path=None):
     _load_model_f = funcy.partial(_load_model, model_type=model_type, use_small=use_small)
     if model_type not in ("text", "coarse", "fine"):
         raise NotImplementedError()
@@ -270,7 +274,7 @@ def load_model(use_gpu=True, use_small=False, force_reload=False, model_type="te
         models_devices[model_key] = device
         device = "cpu"
     if model_key not in models or force_reload:
-        ckpt_path = _get_ckpt_path(model_type, use_small=use_small)
+        ckpt_path = _get_ckpt_path(model_type, use_small=use_small, model_path=model_path)
         clean_models(model_key=model_key)
         model = _load_model_f(ckpt_path, device)
         models[model_key] = model
@@ -309,6 +313,7 @@ def preload_models(
     fine_use_small=False,
     codec_use_gpu=True,
     force_reload=False,
+    model_path=None,
 ):
     """Load all the necessary models for the pipeline."""
     if _grab_best_device() == "cpu" and (
@@ -316,16 +321,17 @@ def preload_models(
     ):
         logger.warning("No GPU being used. Careful, inference might be very slow!")
     _ = load_model(
-        model_type="text", use_gpu=text_use_gpu, use_small=text_use_small, force_reload=force_reload
+        model_type="text", use_gpu=text_use_gpu, use_small=text_use_small, force_reload=force_reload, model_path=model_path
     )
     _ = load_model(
         model_type="coarse",
         use_gpu=coarse_use_gpu,
         use_small=coarse_use_small,
         force_reload=force_reload,
+        model_path=model_path,
     )
     _ = load_model(
-        model_type="fine", use_gpu=fine_use_gpu, use_small=fine_use_small, force_reload=force_reload
+        model_type="fine", use_gpu=fine_use_gpu, use_small=fine_use_small, force_reload=force_reload, model_path=model_path
     )
     _ = load_codec_model(use_gpu=codec_use_gpu, force_reload=force_reload)
 
@@ -385,6 +391,7 @@ def generate_text_semantic(
     max_gen_duration_s=None,
     allow_early_stop=True,
     use_kv_caching=False,
+    model_path=None,
 ):
     """Generate semantic tokens from text."""
     assert isinstance(text, str)
@@ -406,7 +413,7 @@ def generate_text_semantic(
     global models
     global models_devices
     if "text" not in models:
-        preload_models()
+        preload_models(model_path=model_path)
     model_container = models["text"]
     model = model_container["model"]
     tokenizer = model_container["tokenizer"]
@@ -538,6 +545,7 @@ def generate_coarse(
     max_coarse_history=630,  # min 60 (faster), max 630 (more context)
     sliding_window_len=60,
     use_kv_caching=False,
+    model_path=None,
 ):
     """Generate coarse audio codes from semantic tokens."""
     assert (
@@ -593,7 +601,7 @@ def generate_coarse(
     global models
     global models_devices
     if "coarse" not in models:
-        preload_models()
+        preload_models(model_path=model_path)
     model = models["coarse"]
     if OFFLOAD_CPU:
         model.to(models_devices["coarse"])
@@ -693,6 +701,7 @@ def generate_fine(
     history_prompt=None,
     temp=0.5,
     silent=True,
+    model_path=None,
 ):
     """Generate full audio codes from coarse audio codes."""
     assert (
@@ -721,7 +730,7 @@ def generate_fine(
     global models
     global models_devices
     if "fine" not in models:
-        preload_models()
+        preload_models(model_path=model_path)
     model = models["fine"]
     if OFFLOAD_CPU:
         model.to(models_devices["fine"])
