@@ -146,7 +146,7 @@ def _get_ckpt_path(model_type, use_small=False, model_path=None):
             key += "_small"
         return os.path.join(CACHE_DIR, REMOTE_MODEL_PATHS[key]["file_name"])
 
-    model_path += model_type + '.pt' if use_small or USE_SMALL_MODELS else '_2.pt'
+    model_path += model_type + ('.pt' if use_small or USE_SMALL_MODELS else '_2.pt')
     return model_path
 
 
